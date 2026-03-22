@@ -450,6 +450,58 @@ local function IsWeaponBuff(name)
     return false
 end
 
+-- Applies a weapon coating (oil, sharpening stone, poison) from bags to the specified weapon slot
+-- slot: "mainhand" or "offhand"
+-- itemName: the clean item name (without "(MH)"/"(OH)" suffix)
+local function ApplyWeaponOil(itemName, slot)
+    for bag = 0, 4 do
+        for bagSlot = 1, GetContainerNumSlots(bag) do
+            local link = GetContainerItemLink(bag, bagSlot)
+            if link then
+                local _, _, linkItemName = string.find(link, "%[(.-)%]")
+                if linkItemName then
+                    -- Remove charge information if present (e.g., "Brilliant Wizard Oil (5)" -> "Brilliant Wizard Oil")
+                    linkItemName = string.gsub(linkItemName, " %(%d+%)$", "")
+                    if linkItemName == itemName then
+                        if slot == "mainhand" then
+                            if not GetInventoryItemTexture("player", 16) then
+                                DEFAULT_CHAT_FRAME:AddMessage("|cffFF6B6BNo weapon equipped in main hand slot.|r")
+                                return false
+                            end
+                            UseContainerItem(bag, bagSlot)
+                            PickupInventoryItem(16)
+                            ReplaceEnchant()
+                            ClearCursor()
+                            DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00" .. itemName .. " applied to main hand.|r")
+                        elseif slot == "offhand" then
+                            if not GetInventoryItemTexture("player", 17) then
+                                DEFAULT_CHAT_FRAME:AddMessage("|cffFF6B6BNo weapon equipped in off hand slot.|r")
+                                return false
+                            end
+                            UseContainerItem(bag, bagSlot)
+                            PickupInventoryItem(17)
+                            ReplaceEnchant()
+                            ClearCursor()
+                            DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00" .. itemName .. " applied to off hand.|r")
+                        end
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    DEFAULT_CHAT_FRAME:AddMessage("|cffFF6B6B" .. itemName .. " not found in bags.|r")
+    return false
+end
+
+local function IsWeaponCoating(name)
+    local n = string.lower(name)
+    return string.find(n, "wizard oil") or string.find(n, "mana oil")
+        or string.find(n, "frost oil") or string.find(n, "shadowoil")
+        or string.find(n, "coating") or string.find(n, "sharpening stone")
+        or string.find(n, "poison")
+end
+
 -- Weapon Buff Status (Returns: isActive, timeRemaining, SlotName)
 local function GetWeaponBuffStatus(dbEntry)
     if not IsWeaponBuff(dbEntry.name) then return false, 0, nil end
@@ -563,6 +615,19 @@ local function UseItemOrSpell(dbEntry)
         local dialog = StaticPopup_Show("Consumables_CONFIRM_FLASK", cleanName)
         if dialog then dialog.data = cleanName end
         return
+    end
+
+    -- Weapon coatings (oils, sharpening stones, poisons): apply directly to weapon slot
+    if IsWeaponCoating(cleanName) then
+        local isMH = string.find(name, "%(MH%)")
+        local isOH = string.find(name, "%(OH%)")
+        if isMH then
+            ApplyWeaponOil(cleanName, "mainhand")
+            return
+        elseif isOH then
+            ApplyWeaponOil(cleanName, "offhand")
+            return
+        end
     end
 
     if id and id ~= 0 then
