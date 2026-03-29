@@ -867,7 +867,15 @@ function RenderBuffIcons(frame, buffList, settings, isRightAligned)
                     t = iconF:CreateTexture(iconF:GetName().."_Tex", "BACKGROUND")
                     t:SetAllPoints(iconF)
                 end
-                t:SetTexture("Interface\\Icons\\" .. buff.icon)
+                -- Show fallback icon if primary is out of stock
+                local fbEntry = buff.fallback and FindDBEntryByName(buff.fallback) or nil
+                local primaryCount = GetItemCountByID(buff.id)
+                local fallbackCount = fbEntry and GetItemCountByID(fbEntry.id) or 0
+                local displayIcon = buff.icon
+                if primaryCount == 0 and fallbackCount > 0 and fbEntry then
+                    displayIcon = fbEntry.icon
+                end
+                t:SetTexture("Interface\\Icons\\" .. displayIcon)
 
                 local cd = getglobal(iconF:GetName().."_CD")
                 if not cd then
@@ -913,8 +921,16 @@ function RenderBuffIcons(frame, buffList, settings, isRightAligned)
                     countText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE") 
                     countText:SetPoint("BOTTOMRIGHT", -2, 2)
                 end
-                local bagCount = GetItemCountByID(buff.id)
-                if bagCount > 0 then countText:SetText(bagCount) else countText:SetText("") end
+                -- Count display: show "primary+fallback" if both exist, or just whichever is available
+                if primaryCount > 0 and fallbackCount > 0 then
+                    countText:SetText(primaryCount .. "+" .. fallbackCount)
+                elseif primaryCount > 0 then
+                    countText:SetText(primaryCount)
+                elseif fallbackCount > 0 then
+                    countText:SetText(fallbackCount)
+                else
+                    countText:SetText("")
+                end
 
                 local timerText = getglobal(iconF:GetName().."_Timer")
                 if not timerText then
